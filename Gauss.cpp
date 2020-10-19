@@ -3,6 +3,10 @@
         #include <stdlib.h>
         #include <time.h>
         #include <mpi.h>
+        #include <omp.h>
+
+        #define THREAD_NUM 4
+
         int main(int argc, char **argv)
     {
         MPI_Init(&argc, &argv);
@@ -15,7 +19,8 @@
         clock_t begin1, end1, begin2, end2;
         MPI_Status status;    
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);   
-        MPI_Comm_size(MPI_COMM_WORLD, &nprocs);   
+        MPI_Comm_size(MPI_COMM_WORLD, &nprocs); 
+        omp_set_thread_num(THREAD_NUM);
         if (rank==0)
         {
             for (i=0; i<n; i++)
@@ -37,6 +42,7 @@
             printf("\n\n");
         }    
         begin1 =clock(); 
+        //asigna los valores iniciales 
         MPI_Bcast (&A[0][0],500*500,MPI_DOUBLE,0,MPI_COMM_WORLD);
         MPI_Bcast (b,n,MPI_DOUBLE,0,MPI_COMM_WORLD);       
         for(i=0; i<n; i++)
@@ -47,13 +53,16 @@
         {
         MPI_Bcast (&A[k][k],n-k,MPI_DOUBLE,map[k],MPI_COMM_WORLD);
         MPI_Bcast (&b[k],1,MPI_DOUBLE,map[k],MPI_COMM_WORLD);
+        //comienza el metodo con paralelizacion
+        #pragma omp parallel for
         for(i= k+1; i<n; i++) 
         {
             if(map[i] == rank)
             {
                 c[i]=A[i][k]/A[k][k];
             }
-        }               
+        }           
+        #pragma omp parallel for    
         for(i= k+1; i<n; i++) 
         {       
             if(map[i] == rank)
@@ -68,10 +77,11 @@
     }
     end1 = clock();
     begin2 =clock();
-
+    #pragma omp parallel
     if (rank==0)
     { 
         x[n-1]=b[n-1]/A[n-1][n-1];
+        #pragma omp for
         for(i=n-2;i>=0;i--)
         {
             sum=0;
